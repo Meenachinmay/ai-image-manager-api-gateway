@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: ai-image-rabbitmq-local
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_log:/var/log/rabbitmq
+    networks:
+      - api-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-image-server-gateway-local
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=local
+      - PORT=8080
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - LOG_LEVEL=debug
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api-network
+
+volumes:
+  rabbitmq_data:
+  rabbitmq_log:
+
+networks:
+  api-network:
+    driver: bridge
